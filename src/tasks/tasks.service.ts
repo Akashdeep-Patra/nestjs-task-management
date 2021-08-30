@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { User } from 'src/auth/user.entity';
+import { DeleteResult } from 'typeorm';
 import { CreateTaskDto } from './create-task.dto';
-import { TaskStatus } from './task-status.enum';
+import { GetTasksFilterDto } from './get-tasks-filter.dto';
 import { Task } from './task.entity';
 import { TasksRepository } from './task.repository';
 import { UpdateTaskDto } from './update-task.dto';
@@ -14,12 +16,12 @@ export class TasksService {
   async getAllTasks(): Promise<Task[]> {
     return await this.tasksRepository.find();
   }
-  async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
-    return this.tasksRepository.createTask(createTaskDto);
+  async createTask(createTaskDto: CreateTaskDto, user: User): Promise<Task> {
+    return this.tasksRepository.createTask(createTaskDto, user);
   }
-  async getTaskById(id: string): Promise<Task> {
+  async getTaskById(id: string, user: User): Promise<Task> {
     //try to get task if not throw a 404 error
-    const found = await this.tasksRepository.findOne(id);
+    const found = await this.tasksRepository.findOne({ where: { id, user } });
     if (!found) {
       throw new NotFoundException(
         `Oops looks like task with id ${id} does not exist`,
@@ -27,24 +29,24 @@ export class TasksService {
     }
     return found;
   }
-  async deleteTaskById(id: string) {
-    await this.getTaskById(id);
+  async deleteTaskById(id: string, user: User): Promise<DeleteResult> {
+    await this.getTaskById(id, user);
     return await this.tasksRepository.delete(id);
   }
 
   async updateTaskById(
     id: string,
     updateTaskDto: UpdateTaskDto,
+    user: User,
   ): Promise<Task> {
-    const found = this.getTaskById(id);
-    return this.tasksRepository.save({ ...found, ...updateTaskDto });
+    const found = await this.getTaskById(id, user);
+
+    return await this.tasksRepository.save({ ...found, ...updateTaskDto });
   }
-  // getTasksWithFilters(filterDto: GetTasksFilterDto): Task[] {
-  //   return this.tasks.filter(
-  //     ({ status, title, description }) =>
-  //       status === filterDto.status ||
-  //       title.search(filterDto.searchText) !== -1 ||
-  //       description.search(filterDto.searchText) !== -1,
-  //   );
-  // }
+  async getTasksWithFilters(
+    filterDto: GetTasksFilterDto,
+    user: User,
+  ): Promise<Task[]> {
+    return this.tasksRepository.getTasks(filterDto, user);
+  }
 }
